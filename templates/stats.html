@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<title>Stats</title>
+		<link rel="stylesheet" href="{{ url_for('static', filename='download.css') }}">
+		<style>
+            .container {
+                margin: 10px 10px 10px 10px;  
+                border: 5px solid #00bba3;
+                overflow: auto
+            }
+            img {
+                display: block;
+                float: left;
+                width: 40%
+            }
+            .text {
+                margin: 5px
+            }
+		</style>
+	</head>
+	<body>
+        <div style="max-width: 900px; margin: auto;">
+            <div class="container">
+                <h1>
+                    <a href="{{ url_for('logout') }}">logout</a>
+                </h1>  
+            </div>
+            {%  for release in releases %}
+                <div class="container">
+                        <img src="{{ releases[release]['albumImage'] }}">
+                        <div class="text">
+                            <h2>{{ releases[release]['bandName'] }} - {{ releases[release]['albumName'] }}</h2>
+                            <p>
+                                Codes insgesamt: {{ releases[release]['numberOfCodes'] }}
+                            </p>
+                            <p>
+                                gesamte Downloads: {{ releases[release]['totalStats'] }}
+                            </p>
+                            <p>
+                                verschiedene verwendete Codes: {{ releases[release]['uniqueStats'] }}
+                            </p>
+                        </div>
+                </div>
+            {% endfor %}
+        </div>
+	</body>
+</html>
