@@ -135,7 +135,8 @@ def handler(handleThis, code=None):
                     return '<script>alert("Invalid Code");window.location.replace("../' + str(handleThis)  + '")</script>'
 
 
-app.run(host='localhost', port=64004)
+if __name__ == '__main__':
+    app.run(host='localhost', port=64004)
 
 
 
