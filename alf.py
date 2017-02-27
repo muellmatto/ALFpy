@@ -6,10 +6,11 @@ import redis
 import hashlib
 import os
 import sys
-import base64
 import alfmin
 import configparser
 
+# replace with send img!!!!
+import base64
 
 alfPath = os.path.dirname(os.path.realpath(__file__))
 alfmin.alfPath = alfPath
@@ -67,6 +68,26 @@ def stats():
         userName = flask.escape(flask.session['username'])
         if userName == 'admin':
             return flask.redirect(flask.url_for('admin'))
+        if flask.request.method == "POST":
+            a = dict(flask.request.form)
+            alfData = { x : a[x][0] for x in a.keys() }
+            print(alfData)
+            if set(('addAlfAlbum', 'bandName','albumName','albumInfo','downloadLimit')).issubset(alfData) and 'albumZip' in flask.request.files and 'albumImage' in flask.request.files:
+                bandName = alfData['bandName']
+                albumName = alfData['albumName']
+                albumInfo = alfData['albumInfo']
+                albumID = alfData['albumID']
+                downloadLimit = alfData['downloadLimit']
+                b = dict(flask.request.files)
+                print(b)
+                zipFile = flask.request.files['albumZip']
+                imageFile = flask.request.files['albumImage']
+                if '' in [zipFile.filename, imageFile.filename, bandName, albumName, albumInfo, albumID, downloadLimit]:
+                    flask.flash('fill every field and select a zip-file')
+                addAlbumSuccess, msg = alfmin.addAlfAlbum(albumID, bandName, albumName, userName, downloadLimit, albumInfo, imageFile, zipFile)
+                flask.flash(msg)
+            else:
+                flask.flash('invalid post request :(')
         releases = alfmin.listAlfUserAlbums(userName)
         return flask.render_template("stats.html", releases=releases)
     return 'You are not logged in <br><a href="' + flask.url_for('login') + '">login</a>'
@@ -189,7 +210,7 @@ def handler(handleThis, code=None):
 
 
 if __name__ == '__main__':
-    app.run(host='localhost', port=64004)
+    app.run(host='localhost', port=64004, debug=True)
 
 
 
