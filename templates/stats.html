@@ -22,6 +22,15 @@
 		</style>
 	</head>
 	<body>
+        {% with messages = get_flashed_messages() %}
+          {% if messages %}
+            <ul style="background: red;">
+            {% for message in messages %}
+              <li>{{ message }}</li>
+            {% endfor %}
+            </ul>
+          {% endif %}
+        {% endwith %}
         <div style="max-width: 900px; margin: auto;">
             <div class="container">
                 <h1>
@@ -45,6 +54,58 @@
                         </div>
                 </div>
             {% endfor %}
+            <hr>
+                <form method="post" enctype=multipart/form-data>
+                    <h2>add new album</h2>
+                    <label>
+                        album ID (needs to be unique .... systemwide, sorry)
+                        <br> 
+                        just check in your browser if /ID already exists
+                        <br> 
+                        <input name="albumID" type="text" required>
+                    </label>
+                    <br> 
+                    <label>
+                        bandname:
+                        <br> 
+                        <input name="bandName" type="text" required>
+                    </label>
+                        <br> 
+                    <label>
+                        releasename:
+                        <br> 
+                        <input name="albumName" type="text" required>
+                    </label>
+                        <br> 
+                    <label>
+                        maximum number of downloads per code:
+                        <br> 
+                        <input name="downloadLimit" type="number" min="1" step="1" required>
+                    </label>
+                        <br> 
+                    <label>
+                        zip file:
+                        <br> 
+                        <input name="albumZip" type="file" accept="application/zip" required>
+                    </label>
+                        <br> 
+                    <label>
+                        Image file (jpeg):
+                        <br> 
+                        <input name="albumImage" type="file" accept="image/jpeg" required>
+                    </label>
+                        <br> 
+                    <label>
+                        short info text (e.g. tracklist or url):
+                        <br> 
+                        <textarea name="albumInfo" type="text" style="width: 20rem; height: 15rem; margin: 0.5rem;" required></textarea>
+                    </label>
+                        <br> 
+                    <input type="submit" name="addAlfAlbum" value="add new album">
+                </form>
+            <hr>
+
+            <h2>change password</h2>
         </div>
 	</body>
 </html>
