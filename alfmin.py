@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import redis
+# import redis
 import hashlib
 import os
 import random
+
+# replace with send img!!!!
+import base64 
 
 # This is a python module, r and alfPath should be provided by ALF
 
@@ -132,10 +135,10 @@ def listAlfAlbums():
     return alfAlbums
 
 
-def addAlfAlbum(albumID, bandName, albumName, user, limit, albumText, albumImage, albumZip):
+def addAlfAlbum(albumID, bandName, albumName, user, limit, albumText, flaskFileImage, flaskFileZip):
     """
     add an Album to Alf.
-    ( <str> albumID, bandName, albumName, user, limit, albumText, <binary> albumImage, albumZip) -> True or False
+    ( <str> albumID, bandName, albumName, user, limit, albumText, <binary> albumImage, flaskFileObject) -> (True or False, message)
     albumID allowed Characters = 'abcdefghijklmnopqrstuvwxyz0123456789'
     """
     allowedChars = 'abcdefghijklmnopqrstuvwxyz0123456789'
@@ -143,27 +146,44 @@ def addAlfAlbum(albumID, bandName, albumName, user, limit, albumText, albumImage
         if c not in allowedChars:
             albumID.replace(c, '')
     if 'ALBUM:'+albumID  in r.keys():
-        return False
+        return (False, 'ID exists, please choose another one')
     if not 'USER:' + user in r.keys():
-        return False
+        return (False, 'user does not exist')
     if not limit.isdigit():
-        return False
-    r.hset('ALBUM:' + album, 'bandname', bandName)
-    r.hset('ALBUM:' + album, 'albumname', albumName)
-    r.hset('ALBUM:' + album, 'limit', limit)
-    r.hset('ALBUM:' + album, 'user', user)
-    r.hset('USER:' + user, album, 'ALBUM:'+album)
-    print('album ONLY added to redis!')
+        return (False, 'download limit needs to be an integer')
+    r.hset('ALBUM:' + albumID, 'bandname', bandName)
+    r.hset('ALBUM:' + albumID, 'albumname', albumName)
+    r.hset('ALBUM:' + albumID, 'limit', limit)
+    r.hset('ALBUM:' + albumID, 'user', user)
+    r.hset('USER:' + user, albumID, 'ALBUM:'+albumID)
+
     albumPath = alfPath + '/users/' + user + '/' + albumID
     os.mkdir(albumPath)
     with open (albumPath + '/' + albumID + '.html', "xt") as htmlFile:
         htmlFile.write(albumText)
-    with open (albumPath + '/' + albumID + '.jpg', "xb") as jpgFile:
-        jpgFile.write(albumZip)
-    with open (albumPath + '/' + albumID + '.zip', "xb") as zipFile:
-        zipFile.write(albumImage)
-    # save albumid.{html,zip,jpg}
-    return True
+    flaskFileZip.save(os.path.join(albumPath, albumID + '.zip'))
+    flaskFileImage.save(os.path.join(albumPath, albumID + '.jpg'))
+    return (True, 'album added!')
+
+def getAlbumStats(albumRedisKey, userName):
+    '''
+    Returns a triple of stats:
+    (used Codes , total Downloads incl. multiple , number of codes)
+    '''
+    album = r.hgetall(albumRedisKey)
+    uniqueStats = 0
+    totalStats = 0
+    numberOfCodes = 0
+    if 'user' in album:
+        if userName == album['user']:
+            for code in album:
+                if code not in ['stats', 'limit', 'user' ,'bandname', 'albumname','damniam']:
+                    numberOfCodes += 1
+                    dlCount= int(album[code])
+                    totalStats += dlCount
+                    if dlCount > 0:
+                        uniqueStats += 1
+    return uniqueStats, totalStats, numberOfCodes
 
 
 def __createNewCode(n=8):
