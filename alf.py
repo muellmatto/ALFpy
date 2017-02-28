@@ -8,6 +8,7 @@ import os
 import sys
 import alfmin
 import configparser
+import markdown
 
 # replace with send img!!!!
 import base64
@@ -103,8 +104,7 @@ def downloadCodeFile(albumID, codeFile):
             return flask.redirect(flask.url_for('admin'))
         codeFilePath = os.path.join( alfPath, 'users' , userName, albumID, codeFile )
         if os.path.exists(codeFilePath):
-            return 'fuck'
-            # return flask.send_file(codeFilePath, mimetype="text/plain", as_attachment=True, attachment_filename=codeFilePath)
+            return flask.send_file(codeFilePath, mimetype="text/plain", as_attachment=True, attachment_filename=codeFile)
     else:
         return flask.redirect(flask.url_for('login'))
 
@@ -205,6 +205,7 @@ def handler(handleThis, code=None):
             albumImageFile = alfPath + '/users/' + userName + '/' + handleThis + '/' + handleThis + '.jpg'
             albumImage = 'data:image/jpg;base64,' + base64.b64encode( open(albumImageFile, 'rb').read() ).decode('utf-8')
             albumText = open(alfPath + '/users/' + userName + '/' + handleThis + '/' + handleThis + '.html' , 'r').read()
+            albumText = markdown.markdown(albumText)
             return flask.render_template("download.html", bandName=bandName, albumName=albumName, infoText=albumText, albumImage=albumImage) 
         else:
             # check for code and start download
