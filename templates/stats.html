@@ -55,10 +55,13 @@
                             <p>
                                 maximale Anzahl Downloads pro Codes: {{ releases[release]['limit'] }}
                             </p>
+                            <p>
+                                <a href="{{ url_for( 'handler', handleThis=release )}}" target="_blank">Link zur Downloadseite</a>
+                            </P>
                             <hr>
                                 <p>download codes:</p>
                                 {% for codeFile in releases[release]['codeFiles'] %}
-                                    <br><a href="stats/{{ release }}/{{ codeFile }}">{{ codeFile }}</a>
+                                    <br><a href="{{ url_for('downloadCodeFile',albumID=release, codeFile=codeFile) }}">{{ codeFile }}</a>
                                 {% endfor %}
                                 <br>
                                 <br>
