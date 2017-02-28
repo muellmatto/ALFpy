@@ -38,7 +38,8 @@
                 </h1>  
             </div>
             {%  for release in releases %}
-                <div class="container">
+                <form method="post">
+                    <div class="container">
                         <img src="{{ releases[release]['albumImage'] }}">
                         <div class="text">
                             <h2>{{ releases[release]['bandName'] }} - {{ releases[release]['albumName'] }}</h2>
@@ -51,8 +52,26 @@
                             <p>
                                 verschiedene verwendete Codes: {{ releases[release]['uniqueStats'] }}
                             </p>
+                            <p>
+                                maximale Anzahl Downloads pro Codes: {{ releases[release]['limit'] }}
+                            </p>
+                            <hr>
+                                <p>download codes:</p>
+                                {% for codeFile in releases[release]['codeFiles'] %}
+                                    <br><a href="stats/{{ release }}/{{ codeFile }}">{{ codeFile }}</a>
+                                {% endfor %}
+                                <br>
+                                <br>
+                            <hr>
+                            <label> NEW CODES:
+                                <input type=number name="numberOfCodes" min="10" max="500" step="10" required>
+                                <input type=hidden name="albumName" value="{{ release }}">
+                                <input type=submit name="addAlfCodes" value="generate new codes">
+                                <br>(codes cannot be removed)
+                            </label>
                         </div>
-                </div>
+                    </div>
+                </form>
             {% endfor %}
             <hr>
                 <form method="post" enctype=multipart/form-data>
