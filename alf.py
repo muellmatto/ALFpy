@@ -62,9 +62,6 @@ app.permanent_session_lifetime = 600
 
 @app.route('/stats', strict_slashes=False, methods=['GET', 'POST'])
 def stats():
-    print('stats access')
-    # we need a button to add codes to each album and a form to add a new album below
-    # maybe we should save generated codes as textfile and give a download link ....
     if 'username' in flask.session:
         userName = flask.escape(flask.session['username'])
         if userName == 'admin':
@@ -72,7 +69,7 @@ def stats():
         if flask.request.method == "POST":
             a = dict(flask.request.form)
             alfData = { x : a[x][0] for x in a.keys() }
-            print(alfData)
+            # print(alfData)
             if set(('addAlfAlbum', 'bandName','albumName','albumInfo','downloadLimit')).issubset(alfData) and 'albumZip' in flask.request.files and 'albumImage' in flask.request.files:
                 bandName = alfData['bandName']
                 albumName = alfData['albumName']
@@ -86,7 +83,7 @@ def stats():
                 addAlbumSuccess, msg = alfmin.addAlfAlbum(albumID, bandName, albumName, userName, downloadLimit, albumInfo, imageFile, zipFile)
                 flask.flash(msg)
             elif set(('addAlfCodes', 'albumName', 'numberOfCodes')).issubset(alfData):
-                print('generating ' + alfData['numberOfCodes'] + ' new codes for ' + alfData['albumName'])
+                # print('generating ' + alfData['numberOfCodes'] + ' new codes for ' + alfData['albumName'])
                 if alfData['numberOfCodes'].isdigit():
                     alfmin.createCodes(alfData['albumName'], userName ,int(alfData['numberOfCodes']))
                 else:
@@ -94,18 +91,14 @@ def stats():
             else:
                 flask.flash('invalid post request :(')
         releases = alfmin.listAlfUserAlbums(userName)
-        print(releases['madamin']['codeFiles'])
         return flask.render_template("stats.html", releases=releases)
     return 'You are not logged in <br><a href="' + flask.url_for('login') + '">login</a>'
 
 
 @app.route('/stats/<albumID>/<codeFile>')
 def downloadCodeFile(albumID, codeFile):
-    print('oh gott oh gott')
     if 'username' in flask.session:
         userName = flask.escape(flask.session['username'])
-        print('name')
-        print(userName)
         if userName == 'admin':
             return flask.redirect(flask.url_for('admin'))
         codeFilePath = os.path.join( alfPath, 'users' , userName, albumID, codeFile )
@@ -132,7 +125,6 @@ def admin():
                         user = alfData['username']
                         if alfData['password1'] == alfData['password2']:
                             passwd = alfData['password1']
-                            print(user, passwd)
                             addAlfUserSuccess = alfmin.addAlfUser( user, passwd)
                             if addAlfUserSuccess:
                                 flask.flash("user "+user+" added!")
