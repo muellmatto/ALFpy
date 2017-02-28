@@ -5,6 +5,9 @@
 import hashlib
 import os
 import random
+import datetime
+import glob
+import re
 
 # replace with send img!!!!
 import base64 
@@ -96,7 +99,9 @@ def listAlfUserAlbums(userName):
                             'numberOfCodes': numberOfCodes,
                             'albumImage': albumImage,
                             'bandName': r.hget('ALBUM:' + release, 'bandname'),
-                            'albumName': r.hget('ALBUM:' + release, 'albumname')
+                            'albumName': r.hget('ALBUM:' + release, 'albumname'),
+                            'limit': r.hget('ALBUM:' + release, 'limit'),
+                            'codeFiles': [f for f in os.listdir(alfPath + '/users/' + userName + '/' + release + '/') if re.match(r''+release+'--' ,f)] 
                             }
     return releases
             
@@ -197,7 +202,7 @@ def __createNewCode(n=8):
     return newCode
 
 
-def _createCodes(albumID, amount = 3):
+def createCodes(albumID, user, amount = 3):
     """
     returns a list of new uniqe generated codes for a given album
     (str albumName , int amount=3) -> (True,list()) or (False, empty-list())
@@ -214,6 +219,10 @@ def _createCodes(albumID, amount = 3):
                 r.hset(albumRedisKey, newHash, "0")
                 newCodes.append(newCode)
                 break
+    albumPath = alfPath + '/users/' + user + '/' + albumID
+    codeFile = albumID + '--' + datetime.datetime.today().strftime('%Y-%m-%d--%H.%M.%S')  + '--' + str(amount) + '-codes.txt'
+    with open( os.path.join(albumPath, codeFile) , 'w') as f:
+        f.write('\n'.join(newCodes))
     return (True, newCodes)
 
 
