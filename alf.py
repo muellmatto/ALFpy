@@ -62,6 +62,7 @@ app.permanent_session_lifetime = 600
 
 @app.route('/stats', strict_slashes=False, methods=['GET', 'POST'])
 def stats():
+    print('stats access')
     # we need a button to add codes to each album and a form to add a new album below
     # maybe we should save generated codes as textfile and give a download link ....
     if 'username' in flask.session:
@@ -78,20 +79,41 @@ def stats():
                 albumInfo = alfData['albumInfo']
                 albumID = alfData['albumID']
                 downloadLimit = alfData['downloadLimit']
-                b = dict(flask.request.files)
-                print(b)
                 zipFile = flask.request.files['albumZip']
                 imageFile = flask.request.files['albumImage']
                 if '' in [zipFile.filename, imageFile.filename, bandName, albumName, albumInfo, albumID, downloadLimit]:
                     flask.flash('fill every field and select a zip-file')
                 addAlbumSuccess, msg = alfmin.addAlfAlbum(albumID, bandName, albumName, userName, downloadLimit, albumInfo, imageFile, zipFile)
                 flask.flash(msg)
+            elif set(('addAlfCodes', 'albumName', 'numberOfCodes')).issubset(alfData):
+                print('generating ' + alfData['numberOfCodes'] + ' new codes for ' + alfData['albumName'])
+                if alfData['numberOfCodes'].isdigit():
+                    alfmin.createCodes(alfData['albumName'], userName ,int(alfData['numberOfCodes']))
+                else:
+                    flask.flash('number of codes is was not a number')
             else:
                 flask.flash('invalid post request :(')
         releases = alfmin.listAlfUserAlbums(userName)
+        print(releases['madamin']['codeFiles'])
         return flask.render_template("stats.html", releases=releases)
     return 'You are not logged in <br><a href="' + flask.url_for('login') + '">login</a>'
 
+
+@app.route('/stats/<albumID>/<codeFile>')
+def downloadCodeFile(albumID, codeFile):
+    print('oh gott oh gott')
+    if 'username' in flask.session:
+        userName = flask.escape(flask.session['username'])
+        print('name')
+        print(userName)
+        if userName == 'admin':
+            return flask.redirect(flask.url_for('admin'))
+        codeFilePath = os.path.join( alfPath, 'users' , userName, albumID, codeFile )
+        if os.path.exists(codeFilePath):
+            return 'fuck'
+            # return flask.send_file(codeFilePath, mimetype="text/plain", as_attachment=True, attachment_filename=codeFilePath)
+    else:
+        return flask.redirect(flask.url_for('login'))
 
 
 @app.route('/admin', strict_slashes=False, methods=["GET", "POST"])
@@ -210,7 +232,8 @@ def handler(handleThis, code=None):
 
 
 if __name__ == '__main__':
-    app.run(host='localhost', port=64004, debug=True)
+    app.run(host='localhost', port=64004)
+    #app.run(host='localhost', port=64004, debug=True)
 
 
 
