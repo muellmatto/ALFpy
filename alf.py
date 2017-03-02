@@ -65,7 +65,7 @@ app.permanent_session_lifetime = 600
 def stats():
     if 'username' in flask.session:
         userName = flask.escape(flask.session['username'])
-        if userName == 'admin':
+        if userName == alfAdminName:
             return flask.redirect(flask.url_for('admin'))
         if flask.request.method == "POST":
             a = dict(flask.request.form)
