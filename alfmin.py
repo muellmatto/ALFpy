@@ -79,6 +79,7 @@ def deleteAlfUser(userName):
                 os.remove(os.path.join(root,name))
             for name in dirs:
                 os.rmdir(os.path.join(root,name))
+        os.rmdir( alfPath + '/users/' + userName  )
         return True
 
 

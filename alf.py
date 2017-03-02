@@ -27,10 +27,13 @@ if not os.path.exists(alfConfigFilePath):
     print('ALF config File not found! EXIT!')
     sys.exit(1)
 alfConfig.read(alfConfigFilePath)
-if not 'ALF' in alfConfig:
+if not set(('ALF', 'REDIS')).issubset(alfConfig):
     print('please check configfile')
     sys.exit(1)
-if 'admin' not in alfConfig['ALF'] or 'password' not in alfConfig['ALF']:
+if not set(('admin', 'password', 'secret')).issubset(alfConfig['ALF']):
+    print('please check configfile')
+    sys.exit(1)
+if not set(('unixsocket', 'socketfile', 'database')).issubset(alfConfig['REDIS']):
     print('please check configfile')
     sys.exit(1)
 
@@ -42,8 +45,19 @@ alfAdminPassword = alfConfig['ALF']['password']
 # redis 
 # -----------------------------------------------------
 
+if alfConfig['REDIS']['UNIXSOCKET'].upper() == 'TRUE':
+    socketPath = alfConfig['REDIS']['SOCKETFILE']
+else:
+    socketPath = None
 
-r = redis.Redis(charset="utf-8", decode_responses=True, db=5)
+try:
+    redisDbNumber = int(alfConfig['REDIS']['database'])
+except:
+    print('please check configfile')
+    sys.exit(1)
+    
+
+r = redis.Redis(charset="utf-8", decode_responses=True ,db=redisDbNumber, unix_socket_path=socketPath)
 alfmin.r = r
 
 
@@ -55,7 +69,7 @@ alfmin.r = r
 
 app = flask.Flask(__name__)
 
-app.secret_key = os.urandom(24)
+app.secret_key = alfConfig['ALF']['SECRET']
 app.permanent_session_lifetime = 600
 
 # -----------------------------------------------------
@@ -81,8 +95,11 @@ def stats():
                 imageFile = flask.request.files['albumImage']
                 if '' in [zipFile.filename, imageFile.filename, bandName, albumName, albumInfo, albumID, downloadLimit]:
                     flask.flash('fill every field and select a zip-file')
-                addAlbumSuccess, msg = alfmin.addAlfAlbum(albumID, bandName, albumName, userName, downloadLimit, albumInfo, imageFile, zipFile)
-                flask.flash(msg)
+                elif albumID in ['login','logout','stats','admin']:
+                    flask.flash('please choose a different id')
+                else:
+                    addAlbumSuccess, msg = alfmin.addAlfAlbum(albumID, bandName, albumName, userName, downloadLimit, albumInfo, imageFile, zipFile)
+                    flask.flash(msg)
             elif set(('addAlfCodes', 'albumName', 'numberOfCodes')).issubset(alfData):
                 # print('generating ' + alfData['numberOfCodes'] + ' new codes for ' + alfData['albumName'])
                 if alfData['numberOfCodes'].isdigit():
@@ -100,7 +117,7 @@ def stats():
 def downloadCodeFile(albumID, codeFile):
     if 'username' in flask.session:
         userName = flask.escape(flask.session['username'])
-        if userName == 'admin':
+        if userName == alfAdminName:
             return flask.redirect(flask.url_for('admin'))
         codeFilePath = os.path.join( alfPath, 'users' , userName, albumID, codeFile )
         if os.path.exists(codeFilePath):
@@ -123,15 +140,18 @@ def admin():
                     alfAction = alfData.pop('alfaction')
                     if alfAction == 'addAlfUser' and 'password1' in alfData and 'password2' in alfData and 'username' in alfData:
                         user = alfData['username']
-                        if alfData['password1'] == alfData['password2']:
-                            passwd = alfData['password1']
-                            addAlfUserSuccess = alfmin.addAlfUser( user, passwd)
-                            if addAlfUserSuccess:
-                                flask.flash("user "+user+" added!")
+                        if user == alfAdminName:
+                            flask.flash('username cannot be the same as adminname')
+                        else:
+                            if alfData['password1'] == alfData['password2']:
+                                passwd = alfData['password1']
+                                addAlfUserSuccess = alfmin.addAlfUser( user, passwd)
+                                if addAlfUserSuccess:
+                                    flask.flash("user "+user+" added!")
+                                else:
+                                    flask.flash("user "+user+" not added, please recheck input")
                             else:
                                 flask.flash("user "+user+" not added, please recheck input")
-                        else:
-                            flask.flash("user "+user+" not added, please recheck input")
                     elif alfAction == 'deleteAlfUser' and 'username' in alfData:
                             user = alfData['username']
                             print(user)
