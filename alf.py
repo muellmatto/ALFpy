@@ -114,7 +114,7 @@ def admin():
     print('alfmin access')
     if 'username' in flask.session:
         userName = flask.escape(flask.session['username'])
-        if userName != 'admin':
+        if userName == alfAdminName:
             if flask.request.method == 'POST':
                 # convert ImmutableDict to dict and get rid of Lists
                 a = dict(flask.request.form)
