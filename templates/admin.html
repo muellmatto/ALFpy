@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<title>ADMIN</title>
+	</head>
+    <body>
+
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                <ul style='background: tomatoe;'>
+                    {% for message in messages %}
+                        <li>{{ message }}</li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        {% endwith %}
+
+
+        <p>ALF-Users:</p>
+        <hr>
+        {% for user in users %}
+            <p>
+                <form action="" method="post">
+                    <p>{{ user }}</p>
+                    <input type=hidden name=username value={{ user }}>
+                    <input type=submit name=alfaction value='deleteAlfUser'>
+                </form>
+            </p>
+            <hr>
+        {% endfor %}
+        <hr>
+        <h3>add user:</h3>
+        <p>
+            <form action="" method="post">
+                <p>new username: 
+                    <input type=text name=username>
+                </p>
+                <p>password:
+                    <input type=password name=password1>
+                </p>
+                <p>repeat password:
+                <input type=password name=password2>
+                </p>
+                <input type=submit name=alfaction value=addAlfUser>
+            </form>
+        </p>
+        <hr>
+        <a href="{{ url_for('logout') }}">logout</a>
+    </body>
+</html>
+
