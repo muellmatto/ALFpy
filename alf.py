@@ -9,6 +9,7 @@ import sys
 import alfmin
 import configparser
 import markdown
+import functools
 
 # replace with send img!!!!
 import base64
@@ -74,62 +75,68 @@ app.permanent_session_lifetime = 600
 
 # -----------------------------------------------------
 
+def alfSession(wrapped):
+    @functools.wraps(wrapped)
+    def alfRequest(*args, **kwargs):
+        if 'username' in flask.session:
+            return wrapped(*args, **kwargs)
+        else:
+            # return flask.redirect(flask.url_for('login'))
+            return 'You are not logged in <br><a href="' + flask.url_for('login') + '">login</a>'
+    return alfRequest
+
 
 @app.route('/stats', strict_slashes=False, methods=['GET', 'POST'])
+@alfSession
 def stats():
-    if 'username' in flask.session:
-        userName = flask.escape(flask.session['username'])
-        if userName == alfAdminName:
-            return flask.redirect(flask.url_for('admin'))
-        if flask.request.method == "POST":
-            a = dict(flask.request.form)
-            alfData = { x : a[x][0] for x in a.keys() }
-            # print(alfData)
-            if set(('addAlfAlbum', 'bandName','albumName','albumInfo','downloadLimit')).issubset(alfData) and 'albumZip' in flask.request.files and 'albumImage' in flask.request.files:
-                bandName = alfData['bandName']
-                albumName = alfData['albumName']
-                albumInfo = alfData['albumInfo']
-                albumID = alfData['albumID']
-                downloadLimit = alfData['downloadLimit']
-                zipFile = flask.request.files['albumZip']
-                imageFile = flask.request.files['albumImage']
-                if '' in [zipFile.filename, imageFile.filename, bandName, albumName, albumInfo, albumID, downloadLimit]:
-                    flask.flash('fill every field and select a zip-file')
-                elif albumID in ['login','logout','stats','admin']:
-                    flask.flash('please choose a different id')
-                else:
-                    addAlbumSuccess, msg = alfmin.addAlfAlbum(albumID, bandName, albumName, userName, downloadLimit, albumInfo, imageFile, zipFile)
-                    flask.flash(msg)
-            elif set(('addAlfCodes', 'albumName', 'numberOfCodes')).issubset(alfData):
-                # print('generating ' + alfData['numberOfCodes'] + ' new codes for ' + alfData['albumName'])
-                if alfData['numberOfCodes'].isdigit():
-                    alfmin.createCodes(alfData['albumName'], userName ,int(alfData['numberOfCodes']))
-                else:
-                    flask.flash('number of codes is was not a number')
+    userName = flask.escape(flask.session['username'])
+    if userName == alfAdminName:
+        return flask.redirect(flask.url_for('admin'))
+    if flask.request.method == "POST":
+        a = dict(flask.request.form)
+        alfData = { x : a[x][0] for x in a.keys() }
+        # print(alfData)
+        if set(('addAlfAlbum', 'bandName','albumName','albumInfo','downloadLimit')).issubset(alfData) and 'albumZip' in flask.request.files and 'albumImage' in flask.request.files:
+            bandName = alfData['bandName']
+            albumName = alfData['albumName']
+            albumInfo = alfData['albumInfo']
+            albumID = alfData['albumID']
+            downloadLimit = alfData['downloadLimit']
+            zipFile = flask.request.files['albumZip']
+            imageFile = flask.request.files['albumImage']
+            if '' in [zipFile.filename, imageFile.filename, bandName, albumName, albumInfo, albumID, downloadLimit]:
+                flask.flash('fill every field and select a zip-file')
+            elif albumID in ['login','logout','stats','admin']:
+                flask.flash('please choose a different id')
             else:
-                flask.flash('invalid post request :(')
-        releases = alfmin.listAlfUserAlbums(userName)
-        return flask.render_template("stats.html", releases=releases)
-    return 'You are not logged in <br><a href="' + flask.url_for('login') + '">login</a>'
+                addAlbumSuccess, msg = alfmin.addAlfAlbum(albumID, bandName, albumName, userName, downloadLimit, albumInfo, imageFile, zipFile)
+                flask.flash(msg)
+        elif set(('addAlfCodes', 'albumName', 'numberOfCodes')).issubset(alfData):
+            # print('generating ' + alfData['numberOfCodes'] + ' new codes for ' + alfData['albumName'])
+            if alfData['numberOfCodes'].isdigit():
+                alfmin.createCodes(alfData['albumName'], userName ,int(alfData['numberOfCodes']))
+            else:
+                flask.flash('number of codes is was not a number')
+        else:
+            flask.flash('invalid post request :(')
+    releases = alfmin.listAlfUserAlbums(userName)
+    return flask.render_template("stats.html", releases=releases)
 
 
 @app.route('/stats/<albumID>/<codeFile>')
+@alfSession
 def downloadCodeFile(albumID, codeFile):
-    if 'username' in flask.session:
-        userName = flask.escape(flask.session['username'])
-        if userName == alfAdminName:
-            return flask.redirect(flask.url_for('admin'))
-        codeFilePath = os.path.join( alfPath, 'users' , userName, albumID, codeFile )
-        if os.path.exists(codeFilePath):
-            return flask.send_file(codeFilePath, mimetype="text/plain", as_attachment=True, attachment_filename=codeFile)
-    else:
-        return flask.redirect(flask.url_for('login'))
+    userName = flask.escape(flask.session['username'])
+    if userName == alfAdminName:
+        return flask.redirect(flask.url_for('admin'))
+    codeFilePath = os.path.join( alfPath, 'users' , userName, albumID, codeFile )
+    if os.path.exists(codeFilePath):
+        return flask.send_file(codeFilePath, mimetype="text/plain", as_attachment=True, attachment_filename=codeFile)
 
 
 @app.route('/admin', strict_slashes=False, methods=["GET", "POST"])
+@alfSession
 def admin():
-    print('alfmin access')
-    if 'username' in flask.session:
         userName = flask.escape(flask.session['username'])
         if userName == alfAdminName:
             if flask.request.method == 'POST':
@@ -165,7 +172,6 @@ def admin():
             users = alfmin.listAlfUsers()
             return flask.render_template("admin.html", users=users)
         return flask.redirect(flask.url_for('stats'))
-    return flask.redirect(flask.url_for('login'))
 
 
 @app.route('/login', methods=['GET', 'POST'])
