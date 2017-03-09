@@ -231,7 +231,7 @@ def handler(handleThis, code=None):
             # check for code and start download
             hashed = hashlib.sha1(code.encode('utf-8')).hexdigest()
             if r.hget(redisKey, hashed) == None:
-                return '<script>alert("Invalid Code");window.location.replace("../' + str(handleThis)  + '")</script>'
+                return '<script>alert("Invalid Code");window.history.back()</script>'
             else:
                 maxDownloads = int(r.hget(redisKey, "limit"))
                 downloadCount = int(r.hget(redisKey, hashed))
@@ -241,7 +241,7 @@ def handler(handleThis, code=None):
                     zipFile = alfPath + '/users/' + userName + '/' + handleThis + '/' + handleThis + '.zip'
                     return flask.send_file(zipFile, mimetype="application/zip", as_attachment=True, attachment_filename=str(bandName) + ' - ' + str(albumName) + '.zip')
                 else:
-                    return '<script>alert("Invalid Code");window.location.replace("../' + str(handleThis)  + '")</script>'
+                    return '<script>alert("Invalid Code");window.history.back()</script>'
 
 
 if __name__ == '__main__':
