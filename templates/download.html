@@ -9,7 +9,7 @@
             function download() {
                 var dlCode = document.getElementById('dlCode').value;
                 var baseURL = window.location.href;
-                window.location.replace(baseURL.concat("/", dlCode));
+                window.location = baseURL.concat("/", dlCode);
             }
 
             function keyPress(event) {
