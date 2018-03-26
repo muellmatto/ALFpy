@@ -59,23 +59,19 @@
                                 <a href="{{ url_for( 'handler', handleThis=release )}}" target="_blank">Link zur Downloadseite</a>
                             </P>
                             <hr>
-                            <p>
-                                Promocodes: (Code - DL-Counter)
-                                <ul>
-                                    {% for promocode in releases[release]['promo'] %}
-                                        <li>
-                                            {{ promocode.code}} - {{promocode.count}}
-                                        </li>
-                                    {% endfor %}
-                                </ul>
-                            </p>
-                            <hr>
                                 <p>download codes:</p>
                                 {% for codeFile in releases[release]['codeFiles'] %}
                                     <br><a href="{{ url_for('downloadCodeFile',albumID=release, codeFile=codeFile) }}">{{ codeFile }}</a>
                                 {% endfor %}
                                 <br>
                                 <br>
+                            <hr>
+                            <p>
+                                <strong>Promocodes: (Code - DL-Counter)</strong>
+                                {% for promocode in releases[release]['promo'] %}
+                                    <br> {{ promocode.code}} - {{promocode.count}}
+                                {% endfor %}
+                            </p>
                             <hr>
                             <label> NEW CODES:
                                 <input type=number name="numberOfCodes" min="10" max="500" step="10" required>
