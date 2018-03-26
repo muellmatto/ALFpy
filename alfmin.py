@@ -93,11 +93,12 @@ def listAlfUserAlbums(userName):
     for release in releases:
         albumImageFile = alfPath + '/users/' + userName + '/' + release + '/' + release + '.jpg'
         albumImage = 'data:image/jpg;base64,' + base64.b64encode( open(albumImageFile, 'rb').read() ).decode('utf-8')
-        uniqueStats, totalStats, numberOfCodes = getAlbumStats('ALBUM:' + release,userName)
+        uniqueStats, totalStats, numberOfCodes, promoStats = getAlbumStats('ALBUM:' + release,userName)
         releases[release] = {
                             'uniqueStats': uniqueStats,
                             'totalStats': totalStats,
                             'numberOfCodes': numberOfCodes,
+                            'promo': promoStats,
                             'albumImage': albumImage,
                             'bandName': r.hget('ALBUM:' + release, 'bandname'),
                             'albumName': r.hget('ALBUM:' + release, 'albumname'),
@@ -183,13 +184,22 @@ def getAlbumStats(albumRedisKey, userName):
     if 'user' in album:
         if userName == album['user']:
             for code in album:
-                if code not in ['stats', 'limit', 'user' ,'bandname', 'albumname','damniam']:
-                    numberOfCodes += 1
-                    dlCount= int(album[code])
-                    totalStats += dlCount
+                if code not in ['stats', 'limit', 'user' ,'bandname', 'albumname','damniam','promocodes']:
+                    dlCount = int(album[code])
+                    if dlCount >= 0:
+                        numberOfCodes += 1
                     if dlCount > 0:
+                        totalStats += dlCount
                         uniqueStats += 1
-    return uniqueStats, totalStats, numberOfCodes
+            # handle promocodes (negative counters)
+            promoStats = []
+            if 'promocodes' in album:
+                promocodes = album['promocodes'].split(',')
+                for promocode in promocodes:
+                    promokey = hashlib.sha1(promocode.encode('utf-8')).hexdigest()
+                    promokey_downloads = 1000000 + int(album[promokey])
+                    promoStats.append({'code': promocode,'count':promokey_downloads})
+    return uniqueStats, totalStats, numberOfCodes, promoStats
 
 
 def __createNewCode(n=8):
