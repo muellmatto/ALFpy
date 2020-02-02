@@ -8,7 +8,6 @@ from os.path import dirname, exists, join, realpath
 from sys import exit
 
 import flask
-from redis import Redis
 from markdown import markdown
 
 import alfmin
@@ -59,8 +58,6 @@ except:
     exit(1)
     
 
-r = Redis(charset="utf-8", decode_responses=True ,db=redisDbNumber, unix_socket_path=socketPath)
-alfmin.r = r
 
 
 
@@ -174,17 +171,18 @@ def admin():
             return flask.render_template("admin.html", users=users)
         return flask.redirect(flask.url_for('stats'))
 
-
+#TODO
 @app.route('/login', methods=['GET', 'POST'])
+@alfmin.db_session
 def login():
     if flask.request.method == 'POST':
         userName = flask.request.form['username']
         passwordHash = sha1( flask.request.form['password'].encode('utf-8') ).hexdigest()
-        if "USER:" + userName in r.keys():
-            if passwordHash == r.hget('USER:' + userName, 'password'): 
-                flask.session.permanent = True
-                flask.session['username'] = userName
-                return flask.redirect(flask.url_for('stats'))
+        user = alfmin.User.get(name=userName, password_hash=passwordHash)
+        if user:
+            flask.session.permanent = True
+            flask.session['username'] = userName
+            return flask.redirect(flask.url_for('stats'))
         elif userName == alfAdminName and flask.request.form['password'] == alfAdminPassword:
             flask.session.permanent = True
             flask.session['username'] = userName
