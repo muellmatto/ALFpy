@@ -1,64 +1,65 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+from configparser import ConfigParser
+from functools import wraps
+from hashlib import sha1
+from os.path import dirname, exists, join, realpath
+from sys import exit
+
 import flask
-import redis
-import hashlib
-import os
-import sys
+from redis import Redis
+from markdown import markdown
+
 import alfmin
-import configparser
-import markdown
-import functools
 
 # replace with send img!!!!
 import base64
 
-alfPath = os.path.dirname(os.path.realpath(__file__))
-alfmin.alfPath = alfPath
+alfPath = dirname(realpath(__file__))
 
 # -----------------------------------------------------
 # read config 
 # -----------------------------------------------------
 
 
-alfConfig = configparser.ConfigParser()
-alfConfigFilePath = os.path.join( alfPath,'alf.conf')
-if not os.path.exists(alfConfigFilePath):
+alf_config = ConfigParser()
+alf_config_path = join( alfPath,'config','alf.conf')
+if not exists(alf_config_path):
     print('ALF config File not found! EXIT!')
-    sys.exit(1)
-alfConfig.read(alfConfigFilePath)
-if not set(('ALF', 'REDIS')).issubset(alfConfig):
+    exit(1)
+alf_config.read(alf_config_path)
+if not set(('ALF', 'REDIS')).issubset(alf_config):
     print('please check configfile')
-    sys.exit(1)
-if not set(('admin', 'password', 'secret')).issubset(alfConfig['ALF']):
+    exit(1)
+if not set(('admin', 'password', 'secret')).issubset(alf_config['ALF']):
     print('please check configfile')
-    sys.exit(1)
-if not set(('unixsocket', 'socketfile', 'database')).issubset(alfConfig['REDIS']):
+    exit(1)
+if not set(('unixsocket', 'socketfile', 'database')).issubset(alf_config['REDIS']):
     print('please check configfile')
-    sys.exit(1)
+    exit(1)
 
-alfAdminName = alfConfig['ALF']['admin']
-alfAdminPassword = alfConfig['ALF']['password']
+alfAdminName = alf_config['ALF']['admin']
+alfAdminPassword = alf_config['ALF']['password']
 
 
 # -----------------------------------------------------
 # redis 
 # -----------------------------------------------------
 
-if alfConfig['REDIS']['UNIXSOCKET'].upper() == 'TRUE':
-    socketPath = alfConfig['REDIS']['SOCKETFILE']
+if alf_config['REDIS']['UNIXSOCKET'].upper() == 'TRUE':
+    socketPath = alf_config['REDIS']['SOCKETFILE']
 else:
     socketPath = None
 
 try:
-    redisDbNumber = int(alfConfig['REDIS']['database'])
+    redisDbNumber = int(alf_config['REDIS']['database'])
 except:
     print('please check configfile')
-    sys.exit(1)
+    exit(1)
     
 
-r = redis.Redis(charset="utf-8", decode_responses=True ,db=redisDbNumber, unix_socket_path=socketPath)
+r = Redis(charset="utf-8", decode_responses=True ,db=redisDbNumber, unix_socket_path=socketPath)
 alfmin.r = r
 
 
@@ -70,13 +71,13 @@ alfmin.r = r
 
 app = flask.Flask(__name__)
 
-app.secret_key = alfConfig['ALF']['SECRET']
+app.secret_key = alf_config['ALF']['SECRET']
 app.permanent_session_lifetime = 600
 
 # -----------------------------------------------------
 
 def alfSession(wrapped):
-    @functools.wraps(wrapped)
+    @wraps(wrapped)
     def alfRequest(*args, **kwargs):
         if 'username' in flask.session:
             return wrapped(*args, **kwargs)
@@ -129,8 +130,8 @@ def downloadCodeFile(albumID, codeFile):
     userName = flask.escape(flask.session['username'])
     if userName == alfAdminName:
         return flask.redirect(flask.url_for('admin'))
-    codeFilePath = os.path.join( alfPath, 'users' , userName, albumID, codeFile )
-    if os.path.exists(codeFilePath):
+    codeFilePath = join( alfPath, 'users' , userName, albumID, codeFile )
+    if exists(codeFilePath):
         return flask.send_file(codeFilePath, mimetype="text/plain", as_attachment=True, attachment_filename=codeFile)
 
 
@@ -178,7 +179,7 @@ def admin():
 def login():
     if flask.request.method == 'POST':
         userName = flask.request.form['username']
-        passwordHash = hashlib.sha1( flask.request.form['password'].encode('utf-8') ).hexdigest()
+        passwordHash = sha1( flask.request.form['password'].encode('utf-8') ).hexdigest()
         if "USER:" + userName in r.keys():
             if passwordHash == r.hget('USER:' + userName, 'password'): 
                 flask.session.permanent = True
@@ -214,45 +215,53 @@ def page_not_found(e):
 def index():
     return 'Welcome to ALF'
 
-
-@app.route("/<handleThis>", defaults={'code': None}, strict_slashes=False)
-@app.route("/<handleThis>/<code>")
-def handler(handleThis, code=None):
+# TODO: Migrate to SQLite3 
+@app.route("/<album_id>", defaults={'code': None}, strict_slashes=False)
+@app.route("/<album_id>/<code>")
+@alfmin.db_session
+def handler(album_id, code=None):
     # check if album
-    redisKey = "ALBUM:" + str(handleThis)
-    if r.hget(redisKey, 'bandname') == None:
+    album = alfmin.Album.get(album_id=album_id)
+    if album is None:
         return 'Welcome to ALF'
+    # check if code empty - display downloadpage
+    if code == None:
+        albumImageFile = alfPath + '/users/' + album.user.name + '/' + album_id + '/' + album_id + '.jpg'
+        albumImage = 'data:image/jpg;base64,' + base64.b64encode( open(albumImageFile, 'rb').read() ).decode('utf-8')
+        albumText = open(alfPath + '/users/' + album.user.name + '/' + album_id + '/' + album_id + '.html' , 'r').read()
+        albumText = markdown(albumText)
+        return flask.render_template(
+                "download.html",
+                bandName=album.band_name,
+                albumName=album.album_name,
+                infoText=albumText,
+                albumImage=albumImage) 
+    # check for code and start download
+    # promocode:
+    promocode = alfmin.Code.get(code=code, album=album, promocode=True)
+    if promocode:
+        code = promocode
     else:
-        bandName = r.hget(redisKey, 'bandname')
-        albumName = r.hget(redisKey, 'albumname')
-        userName = r.hget(redisKey, 'user')
-        # check if code empty - display downloadpage
-        if code == None:
-            albumImageFile = alfPath + '/users/' + userName + '/' + handleThis + '/' + handleThis + '.jpg'
-            albumImage = 'data:image/jpg;base64,' + base64.b64encode( open(albumImageFile, 'rb').read() ).decode('utf-8')
-            albumText = open(alfPath + '/users/' + userName + '/' + handleThis + '/' + handleThis + '.html' , 'r').read()
-            albumText = markdown.markdown(albumText)
-            return flask.render_template("download.html", bandName=bandName, albumName=albumName, infoText=albumText, albumImage=albumImage) 
-        else:
-            # check for code and start download
-            hashed = hashlib.sha1(code.encode('utf-8')).hexdigest()
-            if r.hget(redisKey, hashed) == None:
-                return '<script>alert("Invalid Code");window.history.back()</script>'
-            else:
-                maxDownloads = int(r.hget(redisKey, "limit"))
-                downloadCount = int(r.hget(redisKey, hashed))
-                if int(maxDownloads) > int(downloadCount):
-                    downloadCount += 1
-                    r.hset(redisKey, hashed, downloadCount)
-                    zipFile = alfPath + '/users/' + userName + '/' + handleThis + '/' + handleThis + '.zip'
-                    return flask.send_file(zipFile, mimetype="application/zip", as_attachment=True, attachment_filename=str(bandName) + ' - ' + str(albumName) + '.zip')
-                else:
-                    return '<script>alert("Invalid Code");window.history.back()</script>'
+        hashed = sha1(code.encode('utf-8')).hexdigest()
+        # get code
+        code = alfmin.Code.get(code=hashed, album=album)
+    # check if valid
+    if code is not None:
+        if code.count <= album.limit or promocode is not None:
+            # we need to increment Code ...
+            code.count += 1
+            zipFile = alfPath + '/users/' + album.user.name + '/' + album_id + '/' + album_id + '.zip'
+            return flask.send_file(
+                    zipFile,
+                    mimetype="application/zip",
+                    as_attachment=True,
+                    attachment_filename=str(album.band_name) + ' - ' + str(album.album_name) + '.zip')
+    return '<script>alert("Invalid Code");window.history.back()</script>'
 
 
 if __name__ == '__main__':
-    app.run(host='localhost', port=64004)
-    #app.run(host='localhost', port=64004, debug=True)
+    # app.run(host='localhost', port=64004)
+    app.run(host='localhost', port=64004, debug=True)
 
 
 

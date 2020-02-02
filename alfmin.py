@@ -12,19 +12,19 @@ import re
 # replace with send img!!!!
 import base64 
 
-# This is a python module, r and alfPath should be provided by ALF
+from alf_db import Album, Code, db_session, Downloads, User, select
 
-# r = redis.Redis(charset="utf-8", decode_responses=True, db=5)
-r = None
-# alfPath = os.path.dirname(os.path.realpath(__file__))
-alfPath = None
+# TODO
+# create and delete functions ... 
 
+alfPath = os.path.dirname(os.path.realpath(__file__))
 
+@db_session
 def listAlfUsers():
     """
     returns a list of available users
     """
-    alfUsers = []
+    alfUsers = [user.name for user in select(u for u in User)]
     for key in r.keys():
         if key[:5] == 'USER:':
             alfUsers.append(key[5:])
@@ -82,27 +82,29 @@ def deleteAlfUser(userName):
         os.rmdir( alfPath + '/users/' + userName  )
         return True
 
-
+@db_session
 def listAlfUserAlbums(userName):
     """
     returns all albums (including stats, image and info) for an alf user
     (userName) -> dict
     """
-    releases = r.hgetall('USER:' + userName)
-    releases.pop('password')
-    for release in releases:
+    _releases = select(a for a in Album if a.user.name == userName)
+    releases = dict()
+    # release is an album_id
+    for album in _releases:
+        release = album.album_id
         albumImageFile = alfPath + '/users/' + userName + '/' + release + '/' + release + '.jpg'
         albumImage = 'data:image/jpg;base64,' + base64.b64encode( open(albumImageFile, 'rb').read() ).decode('utf-8')
-        uniqueStats, totalStats, numberOfCodes, promoStats = getAlbumStats('ALBUM:' + release,userName)
-        releases[release] = {
+        uniqueStats, totalStats, numberOfCodes, promoStats = getAlbumStats(album)
+        releases[album.album_id] = {
                             'uniqueStats': uniqueStats,
                             'totalStats': totalStats,
                             'numberOfCodes': numberOfCodes,
                             'promo': promoStats,
                             'albumImage': albumImage,
-                            'bandName': r.hget('ALBUM:' + release, 'bandname'),
-                            'albumName': r.hget('ALBUM:' + release, 'albumname'),
-                            'limit': r.hget('ALBUM:' + release, 'limit'),
+                            'bandName': album.band_name,
+                            'albumName': album.album_name,
+                            'limit': album.limit,
                             'codeFiles': [f for f in os.listdir(alfPath + '/users/' + userName + '/' + release + '/') if re.match(r''+release+'--' ,f)] 
                             }
     return releases
@@ -172,33 +174,20 @@ def addAlfAlbum(albumID, bandName, albumName, user, limit, albumText, flaskFileI
     flaskFileImage.save(os.path.join(albumPath, albumID + '.jpg'))
     return (True, 'album added!')
 
-def getAlbumStats(albumRedisKey, userName):
+@db_session
+def getAlbumStats(album):
     '''
-    Returns a triple of stats:
-    (used Codes , total Downloads incl. multiple , number of codes)
+    Returns some stats:
+    (used Codes , total Downloads incl. multiple , number of codes, promo-downloads)
     '''
-    album = r.hgetall(albumRedisKey)
-    uniqueStats = 0
-    totalStats = 0
-    numberOfCodes = 0
-    if 'user' in album:
-        if userName == album['user']:
-            for code in album:
-                if code not in ['stats', 'limit', 'user' ,'bandname', 'albumname','damniam','promocodes']:
-                    dlCount = int(album[code])
-                    if dlCount >= 0:
-                        numberOfCodes += 1
-                    if dlCount > 0:
-                        totalStats += dlCount
-                        uniqueStats += 1
-            # handle promocodes (negative counters)
-            promoStats = []
-            if 'promocodes' in album:
-                promocodes = album['promocodes'].split(',')
-                for promocode in promocodes:
-                    promokey = hashlib.sha1(promocode.encode('utf-8')).hexdigest()
-                    promokey_downloads = 1000000 + int(album[promokey])
-                    promoStats.append({'code': promocode,'count':promokey_downloads})
+    uniqueStats = len(select(c for c in Code if c.album == album and c.count > 0 and c.promocode == False))
+    totalStats =  sum( [code.count for code in select(c for c in Code if c.album == album and c.promocode == False)] )
+    numberOfCodes = len( select(c for c in Code if c.album == album and c.promocode == False) )
+    promoStats = [
+            {'code': code.code, 'count': code.count}
+            for code in select(c for c in Code if c.album == album and c.promocode == True)
+            ]
+    print(album, promoStats)
     return uniqueStats, totalStats, numberOfCodes, promoStats
 
 
