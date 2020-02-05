@@ -1,3 +1,4 @@
 users
 *.sqlite3
 *.rdb
+config.py
