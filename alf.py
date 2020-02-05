@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 from configparser import ConfigParser
+from datetime import datetime
 from functools import wraps
 from hashlib import sha1
 from os.path import dirname, exists, join, realpath
@@ -92,8 +93,8 @@ def stats():
         return flask.redirect(flask.url_for('admin'))
     if flask.request.method == "POST":
         a = dict(flask.request.form)
-        alfData = { x : a[x][0] for x in a.keys() }
-        # print(alfData)
+        # alfData = { x : a[x][0] for x in a.keys() }   # a[x][0]  .. why???
+        alfData = { x : a[x] for x in a.keys() }
         if set(('addAlfAlbum', 'bandName','albumName','albumInfo','downloadLimit')).issubset(alfData) and 'albumZip' in flask.request.files and 'albumImage' in flask.request.files:
             bandName = alfData['bandName']
             albumName = alfData['albumName']
@@ -110,7 +111,6 @@ def stats():
                 addAlbumSuccess, msg = alfmin.addAlfAlbum(albumID, bandName, albumName, userName, downloadLimit, albumInfo, imageFile, zipFile)
                 flask.flash(msg)
         elif set(('addAlfCodes', 'albumName', 'numberOfCodes')).issubset(alfData):
-            # print('generating ' + alfData['numberOfCodes'] + ' new codes for ' + alfData['albumName'])
             if alfData['numberOfCodes'].isdigit():
                 alfmin.createCodes(alfData['albumName'], userName ,int(alfData['numberOfCodes']))
             else:
@@ -140,7 +140,8 @@ def admin():
             if flask.request.method == 'POST':
                 # convert ImmutableDict to dict and get rid of Lists
                 a = dict(flask.request.form)
-                alfData = { x : a[x][0] for x in a.keys() }
+                alfData = { x : a[x] for x in a.keys() }
+                # alfData = { x : a[x][0] for x in a.keys() }  # a[x][0] WHY??
                 if 'alfaction' in alfData:
                     alfAction = alfData.pop('alfaction')
                     if alfAction == 'addAlfUser' and 'password1' in alfData and 'password2' in alfData and 'username' in alfData:
@@ -159,7 +160,7 @@ def admin():
                                 flask.flash("user "+user+" not added, please recheck input")
                     elif alfAction == 'deleteAlfUser' and 'username' in alfData:
                             user = alfData['username']
-                            print(user)
+                            print('deleted user: '.format(user))
                             deleteAlfUserSuccess = alfmin.deleteAlfUser(user)
                             if deleteAlfUserSuccess:
                                 flask.flash("user "+user+" deleted")
@@ -171,7 +172,6 @@ def admin():
             return flask.render_template("admin.html", users=users)
         return flask.redirect(flask.url_for('stats'))
 
-#TODO
 @app.route('/login', methods=['GET', 'POST'])
 @alfmin.db_session
 def login():
@@ -213,16 +213,15 @@ def page_not_found(e):
 def index():
     return 'Welcome to ALF'
 
-# TODO: Migrate to SQLite3 
 @app.route("/<album_id>", defaults={'code': None}, strict_slashes=False)
 @app.route("/<album_id>/<code>")
 @alfmin.db_session
 def handler(album_id, code=None):
-    # check if album
     album = alfmin.Album.get(album_id=album_id)
+    # check if album
     if album is None:
         return 'Welcome to ALF'
-    # check if code empty - display downloadpage
+    # check if code == empty - display downloadpage
     if code == None:
         albumImageFile = alfPath + '/users/' + album.user.name + '/' + album_id + '/' + album_id + '.jpg'
         albumImage = 'data:image/jpg;base64,' + base64.b64encode( open(albumImageFile, 'rb').read() ).decode('utf-8')
@@ -245,16 +244,17 @@ def handler(album_id, code=None):
         code = alfmin.Code.get(code=hashed, album=album)
     # check if valid
     if code is not None:
-        if code.count <= album.limit or promocode is not None:
+        if code.count < album.limit or promocode is not None:
             # we need to increment Code ...
             code.count += 1
+            download_log = alfmin.Download(code=code, datetime=datetime.now())
             zipFile = alfPath + '/users/' + album.user.name + '/' + album_id + '/' + album_id + '.zip'
             return flask.send_file(
                     zipFile,
                     mimetype="application/zip",
                     as_attachment=True,
                     attachment_filename=str(album.band_name) + ' - ' + str(album.album_name) + '.zip')
-    return '<script>alert("Invalid Code");window.history.back()</script>'
+    return '<script>alert("Invalid Code");window.history.back()</script>'  #TODO raplace with flash() + render
 
 
 if __name__ == '__main__':

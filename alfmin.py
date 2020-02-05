@@ -12,10 +12,8 @@ import re
 # replace with send img!!!!
 import base64 
 
-from alf_db import Album, Code, db_session, Downloads, User, select
+from alf_db import Album, Code, db_session, Download, User, select
 
-# TODO
-# create and delete functions ... 
 
 alfPath = os.path.dirname(os.path.realpath(__file__))
 
@@ -25,17 +23,13 @@ def listAlfUsers():
     returns a list of available users
     """
     alfUsers = [user.name for user in select(u for u in User)]
-    for key in r.keys():
-        if key[:5] == 'USER:':
-            alfUsers.append(key[5:])
-
     # repair if directory is missing
     for user in alfUsers:
         if not os.path.isdir(alfPath + '/users/' + user):
             os.mkdir(alfPath + '/users/' + user)
     return alfUsers
 
-
+@db_session
 def addAlfUser(userName, password):
     """
     add a new user to ALF
@@ -48,32 +42,26 @@ def addAlfUser(userName, password):
     for c in userName:
         if c not in allowedChars:
             userName.replace(c, '')
-    userName = 'USER:' + userName
-    if userName in r.keys():
+    user = User.get(name=userName)
+    if user:
         return False
-    else:
-        passwordHash = hashlib.sha1(password.encode('utf-8')).hexdigest()
-        r.hset(userName, 'password', passwordHash)
-        if not os.path.isdir(alfPath + '/users/' + userName[5:]):
-            os.mkdir(alfPath + '/users/' + userName[5:])
-        return True
+    passwordHash = hashlib.sha1(password.encode('utf-8')).hexdigest()
+    user = User(name=userName, password_hash=passwordHash)
+    if not os.path.isdir(alfPath + '/users/' + userName[5:]):
+        os.mkdir(alfPath + '/users/' + userName[5:])
+    return True
 
-
+@db_session
 def deleteAlfUser(userName):
     """
     delete an ALF user
     (userName) -> True or False
     """
-    userKey = 'USER:' + userName
-    if userKey not in r.keys():
-        return False
-    else:
-        alfAlbums = []
-        for key in r.keys():
-            if key[:6] == 'ALBUM:':
-                if r.hget(key, 'user') == userName:
-                    alfAlbums.append(key[6:])
-        r.delete(userKey)
+    user = User.get(name=userName)
+    if user:
+        # ponyORM does cascade deleting by default ... TODO: Test
+        # Album.select(lambda a: a.user == user).delete(bulk=True)
+        user.delete()
         for root, dirs, files in os.walk(alfPath +'/users/' + userName, topdown=False):
             for name in files:
                 os.remove(os.path.join(root,name))
@@ -81,6 +69,7 @@ def deleteAlfUser(userName):
                 os.rmdir(os.path.join(root,name))
         os.rmdir( alfPath + '/users/' + userName  )
         return True
+    return False
 
 @db_session
 def listAlfUserAlbums(userName):
@@ -110,6 +99,7 @@ def listAlfUserAlbums(userName):
     return releases
             
 
+#TODO
 def deleteAlfAlbum(albumName):
     """
     delete an ALF album
@@ -132,18 +122,7 @@ def deleteAlfAlbum(albumName):
         return True
 
 
-def listAlfAlbums():
-    """
-    returns a list of available albums
-    () -> list
-    """
-    alfAlbums = []
-    for key in r.keys():
-        if key[:6] == 'ALBUM:':
-            alfAlbums.append(key[6:])
-    return alfAlbums
-
-
+@db_session
 def addAlfAlbum(albumID, bandName, albumName, user, limit, albumText, flaskFileImage, flaskFileZip):
     """
     add an Album to Alf.
@@ -154,19 +133,22 @@ def addAlfAlbum(albumID, bandName, albumName, user, limit, albumText, flaskFileI
     for c in albumID:
         if c not in allowedChars:
             albumID.replace(c, '')
-    if 'ALBUM:'+albumID  in r.keys():
+    album = Album.get(album_id=albumID)
+    if album:
         return (False, 'ID exists, please choose another one')
-    if not 'USER:' + user in r.keys():
+    user = User.get(name=user)
+    if user is None:
         return (False, 'user does not exist')
     if not limit.isdigit():
         return (False, 'download limit needs to be an integer')
-    r.hset('ALBUM:' + albumID, 'bandname', bandName)
-    r.hset('ALBUM:' + albumID, 'albumname', albumName)
-    r.hset('ALBUM:' + albumID, 'limit', limit)
-    r.hset('ALBUM:' + albumID, 'user', user)
-    r.hset('USER:' + user, albumID, 'ALBUM:'+albumID)
-
-    albumPath = alfPath + '/users/' + user + '/' + albumID
+    album = Album (
+        album_id = albumID,
+        band_name = bandName,
+        album_name = albumName,
+        limit = limit,
+        user = user
+            )
+    albumPath = alfPath + '/users/' + user.name + '/' + albumID
     os.mkdir(albumPath)
     with open (albumPath + '/' + albumID + '.html', "xt") as htmlFile:
         htmlFile.write(albumText)
@@ -187,7 +169,6 @@ def getAlbumStats(album):
             {'code': code.code, 'count': code.count}
             for code in select(c for c in Code if c.album == album and c.promocode == True)
             ]
-    print(album, promoStats)
     return uniqueStats, totalStats, numberOfCodes, promoStats
 
 
@@ -201,24 +182,22 @@ def __createNewCode(n=8):
         newCode += random.SystemRandom().choice('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789')
     return newCode
 
-
+@db_session
 def createCodes(albumID, user, amount = 3):
     """
     returns a list of new uniqe generated codes for a given album
     (str albumName , int amount=3) -> (True,list()) or (False, empty-list())
     """
-    albumRedisKey='ALBUM:' + albumID
-    if albumRedisKey not in r.keys():
+    album = Album.get(album_id=albumID)
+    if album is None:
         return (False, [])
     newCodes = []
-    for n in range(amount):
-        while True:
+    while len(newCodes) < amount:
             newCode = __createNewCode()
             newHash = hashlib.sha1(newCode.encode('utf-8')).hexdigest()
-            if r.hget(albumRedisKey, newHash) is None:
-                r.hset(albumRedisKey, newHash, "0")
+            if not Code.exists(code=newHash, album=album):
+                code = Code(code=newHash, album=album, count=0, promocode=False)
                 newCodes.append(newCode)
-                break
     albumPath = alfPath + '/users/' + user + '/' + albumID
     codeFile = albumID + '--' + datetime.datetime.today().strftime('%Y-%m-%d--%H.%M.%S')  + '--' + str(amount) + '-codes.txt'
     with open( os.path.join(albumPath, codeFile) , 'w') as f:

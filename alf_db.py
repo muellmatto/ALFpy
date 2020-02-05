@@ -41,10 +41,10 @@ class Code(db.Entity):
     #  composite_key(a, b) will be represented as the UNIQUE ("a", "b") constraint.
     count = Required(int)
     promocode = Required(bool)
-    downloads = Set('Downloads')
+    downloads = Set('Download')
 
 
-class Downloads(db.Entity):
+class Download(db.Entity):
     code = Required('Code')
     datetime = Required(datetime)
 
