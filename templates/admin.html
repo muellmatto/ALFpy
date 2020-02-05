@@ -22,7 +22,7 @@
         <hr>
         {% for user in users %}
             <p>
-                <form action="" method="post">
+            <form action="" method="post" onsubmit="return confirm('delete {{user}} .... u sure????????????')">
                     <p>{{ user }}</p>
                     <input type=hidden name=username value={{ user }}>
                     <input type=submit name=alfaction value='deleteAlfUser'>

@@ -2,3 +2,4 @@ users
 *.sqlite3
 *.rdb
 config.py
+__pycache__
