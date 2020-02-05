@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from configparser import ConfigParser
 from datetime import datetime
 from functools import wraps
 from hashlib import sha1
@@ -22,44 +21,18 @@ alfPath = dirname(realpath(__file__))
 # read config 
 # -----------------------------------------------------
 
-
-alf_config = ConfigParser()
-alf_config_path = join( alfPath,'config','alf.conf')
-if not exists(alf_config_path):
-    print('ALF config File not found! EXIT!')
-    exit(1)
-alf_config.read(alf_config_path)
-if not set(('ALF', 'REDIS')).issubset(alf_config):
-    print('please check configfile')
-    exit(1)
-if not set(('admin', 'password', 'secret')).issubset(alf_config['ALF']):
-    print('please check configfile')
-    exit(1)
-if not set(('unixsocket', 'socketfile', 'database')).issubset(alf_config['REDIS']):
-    print('please check configfile')
-    exit(1)
-
-alfAdminName = alf_config['ALF']['admin']
-alfAdminPassword = alf_config['ALF']['password']
-
-
-# -----------------------------------------------------
-# redis 
-# -----------------------------------------------------
-
-if alf_config['REDIS']['UNIXSOCKET'].upper() == 'TRUE':
-    socketPath = alf_config['REDIS']['SOCKETFILE']
-else:
-    socketPath = None
-
 try:
-    redisDbNumber = int(alf_config['REDIS']['database'])
+    from config.config import (
+            ALF_SECRET,
+            ALF_ADMIN_NAME,
+            ALF_ADMIN_PASSWORD
+    )
 except:
-    print('please check configfile')
+    print('please check config.py')
     exit(1)
-    
 
-
+alfAdminName = ALF_ADMIN_NAME
+alfAdminPassword = ALF_ADMIN_PASSWORD
 
 
 # -----------------------------------------------------
@@ -69,7 +42,7 @@ except:
 
 app = flask.Flask(__name__)
 
-app.secret_key = alf_config['ALF']['SECRET']
+app.secret_key = ALF_SECRET
 app.permanent_session_lifetime = 600
 
 # -----------------------------------------------------

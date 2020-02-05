@@ -1,0 +1,11 @@
+# to generate a secret key:
+#
+# import random, string
+# ''.join([ random.choice(string.digits+string.ascii_letters) for _ in range(100)]) 
+#
+
+
+ALF_ADMIN_NAME = 'alfmin'
+ALF_ADMIN_PASSWORD = 'passmin'
+ALF_SECRET = 'kR65DmcXL9SFLRDFeQOaWTcATH9BxygVEsHGhjJzPuMCHXuz9WlJEgA6lx9nfV7zmKF5vGU1dl5ju5vLUjykWx8p58MSAOmC2rvH'
+
